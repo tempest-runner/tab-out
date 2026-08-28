@@ -1,4 +1,28 @@
-# Tab Out
+# My Tab Out
+
+这是基于 [zarazhangrui/tab-out](https://github.com/zarazhangrui/tab-out) 的个人 fork。它保留了 Tab Out 的标签页分组、跨窗口切换、重复标签检测和稍后阅读能力，并将新标签页重构为：
+
+- 左侧约 1/3：当前打开的标签页，可搜索、切换、关闭或稍后阅读。
+- 右侧约 2/3：AI 工具、学校相关和其他三组常用入口。
+- 预置入口使用本地品牌图标；自定义入口保存在 `chrome.storage.local`。
+- 不加载远程字体，也不通过在线 favicon 服务请求图标。
+
+## 安装个人版本
+
+1. 在 Chrome 打开 `chrome://extensions/`。
+2. 开启右上角“开发者模式”。
+3. 点击“加载已解压的扩展程序”。
+4. 选择本仓库中的 `extension/` 文件夹。
+
+更新代码后，在 `chrome://extensions/` 中点击 **My Tab Out** 卡片上的“重新加载”，然后新建标签页。
+
+## 开发与版本管理
+
+详细约定见 [`docs/VERSIONING.md`](docs/VERSIONING.md)。日常开发从 `main` 新建 `feat/*` 分支；验证后合并回 `main`，并为可安装版本创建语义化版本标签。
+
+---
+
+# Upstream: Tab Out
 
 **Keep tabs on your tabs.**
 
