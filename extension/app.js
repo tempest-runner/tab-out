@@ -1494,14 +1494,16 @@ document.addEventListener('input', async (e) => {
 
 const DEFAULT_QUICK_LINKS = [
   {
-    id: 'ai', label: 'AI 工具', links: [
+    id: 'ai', label: '门户及 AI 工具', links: [
       { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com', logo: 'assets/chatgpt.svg' },
+      { id: 'bing-cn', name: 'Bing 中国大陆版', url: 'https://cn.bing.com/', logo: 'assets/bing.ico' },
+      { id: 'google-global', name: 'Google 国际版', url: 'https://www.google.com/ncr', logo: 'assets/google.ico' },
       { id: 'grok', name: 'Grok', url: 'https://grok.com', logo: 'assets/grok.svg' },
       { id: 'qwen', name: '通义千问', url: 'https://www.qianwen.com', logo: 'assets/qwen.svg' },
     ],
   },
   {
-    id: 'school', label: '学校相关', links: [
+    id: 'school', label: '学校及科研相关', links: [
       { id: 'bucm-digital', name: '数字北中医', url: 'https://i.bucm.edu.cn', logo: 'assets/bucm.png', logoType: 'bucm' },
       { id: 'bucm-jw', name: '本科教务系统', url: 'https://jw.bucm.edu.cn', logo: 'assets/bucm.png', logoType: 'bucm' },
     ],
@@ -1514,6 +1516,8 @@ const DEFAULT_QUICK_LINKS = [
     ],
   },
 ];
+
+const QUICK_LINKS_SCHEMA_VERSION = 2;
 
 const quickLinkState = {
   editing: false,
@@ -1550,16 +1554,58 @@ function defaultLinkFor(id) {
 
 async function loadQuickLinks() {
   if (globalThis.chrome?.storage?.local) {
-    const { personalQuickLinks } = await chrome.storage.local.get('personalQuickLinks');
-    if (Array.isArray(personalQuickLinks)) quickLinkState.categories = personalQuickLinks;
+    const { personalQuickLinks, quickLinksSchemaVersion = 1 } = await chrome.storage.local.get([
+      'personalQuickLinks',
+      'quickLinksSchemaVersion',
+    ]);
+    if (Array.isArray(personalQuickLinks)) {
+      quickLinkState.categories = quickLinksSchemaVersion < QUICK_LINKS_SCHEMA_VERSION
+        ? migrateQuickLinks(personalQuickLinks)
+        : personalQuickLinks;
+
+      if (quickLinksSchemaVersion < QUICK_LINKS_SCHEMA_VERSION) {
+        await chrome.storage.local.set({
+          personalQuickLinks: quickLinkState.categories,
+          quickLinksSchemaVersion: QUICK_LINKS_SCHEMA_VERSION,
+        });
+      }
+    }
   }
   renderQuickLinks();
 }
 
 async function saveQuickLinks() {
   if (globalThis.chrome?.storage?.local) {
-    await chrome.storage.local.set({ personalQuickLinks: quickLinkState.categories });
+    await chrome.storage.local.set({
+      personalQuickLinks: quickLinkState.categories,
+      quickLinksSchemaVersion: QUICK_LINKS_SCHEMA_VERSION,
+    });
   }
+}
+
+function migrateQuickLinks(categories) {
+  const migrated = structuredClone(categories);
+  const aiCategory = migrated.find(category => category.id === 'ai');
+  const schoolCategory = migrated.find(category => category.id === 'school');
+
+  if (aiCategory) {
+    aiCategory.label = '门户及 AI 工具';
+    const additions = DEFAULT_QUICK_LINKS
+      .find(category => category.id === 'ai')
+      .links.filter(link => ['bing-cn', 'google-global'].includes(link.id));
+    const existingAdditions = new Map(
+      aiCategory.links
+        .filter(link => ['bing-cn', 'google-global'].includes(link.id))
+        .map(link => [link.id, link]),
+    );
+    const orderedAdditions = additions.map(link => existingAdditions.get(link.id) || link);
+    aiCategory.links = aiCategory.links.filter(link => !existingAdditions.has(link.id));
+    const chatGptIndex = aiCategory.links.findIndex(link => link.id === 'chatgpt');
+    aiCategory.links.splice(chatGptIndex >= 0 ? chatGptIndex + 1 : 0, 0, ...orderedAdditions);
+  }
+
+  if (schoolCategory) schoolCategory.label = '学校及科研相关';
+  return migrated;
 }
 
 function renderQuickLinks() {
