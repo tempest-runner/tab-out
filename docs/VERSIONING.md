@@ -62,6 +62,7 @@ git merge upstream/main
 ## 每次提交前的最低检查
 
 ```bash
+node --test tests/background.test.js
 node --check extension/app.js
 node --check extension/background.js
 jq empty extension/manifest.json
