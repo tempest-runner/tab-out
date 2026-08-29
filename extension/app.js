@@ -1499,7 +1499,7 @@ const DEFAULT_QUICK_LINKS = [
       { id: 'bing-cn', name: 'Bing 中国大陆版', url: 'https://cn.bing.com/', logo: 'assets/bing.ico' },
       { id: 'google-global', name: 'Google 国际版', url: 'https://www.google.com/ncr', logo: 'assets/google.ico' },
       { id: 'grok', name: 'Grok', url: 'https://grok.com', logo: 'assets/grok.svg' },
-      { id: 'qwen', name: '通义千问', url: 'https://www.qianwen.com', logo: 'assets/qwen.svg' },
+      { id: 'qwen', name: '通义千问', url: 'https://www.qianwen.com', logo: 'assets/qwen-blue.png' },
     ],
   },
   {
@@ -1517,7 +1517,7 @@ const DEFAULT_QUICK_LINKS = [
   },
 ];
 
-const QUICK_LINKS_SCHEMA_VERSION = 2;
+const QUICK_LINKS_SCHEMA_VERSION = 3;
 
 const quickLinkState = {
   editing: false,
@@ -1602,6 +1602,9 @@ function migrateQuickLinks(categories) {
     aiCategory.links = aiCategory.links.filter(link => !existingAdditions.has(link.id));
     const chatGptIndex = aiCategory.links.findIndex(link => link.id === 'chatgpt');
     aiCategory.links.splice(chatGptIndex >= 0 ? chatGptIndex + 1 : 0, 0, ...orderedAdditions);
+
+    const qwenLink = aiCategory.links.find(link => link.id === 'qwen');
+    if (qwenLink) qwenLink.logo = 'assets/qwen-blue.png';
   }
 
   if (schoolCategory) schoolCategory.label = '学校及科研相关';
