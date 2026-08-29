@@ -15,6 +15,47 @@
 
 // ─── Badge updater ────────────────────────────────────────────────────────────
 
+const personalNewTabUrl = chrome.runtime.getURL('index.html');
+const redirectingNewTabIds = new Set();
+
+function isPersonalNewTab(tab) {
+  const url = tab?.pendingUrl || tab?.url || '';
+  return url === personalNewTabUrl || url === 'chrome://newtab/';
+}
+
+/**
+ * Reuse the most recently visited personal new-tab page.
+ *
+ * Chrome must create a tab before an extension can react to Cmd/Ctrl+T, so the
+ * duplicate may exist for a split second. We immediately focus the previous
+ * personal new-tab page, focus its window, and close the newly created tab.
+ */
+async function reuseExistingNewTab(candidateTab) {
+  if (!candidateTab?.id || !isPersonalNewTab(candidateTab)) return;
+  if (redirectingNewTabIds.has(candidateTab.id)) return;
+  redirectingNewTabIds.add(candidateTab.id);
+
+  try {
+    const tabs = await chrome.tabs.query({});
+    const existingTabs = tabs
+      .filter(tab => tab.id !== candidateTab.id && isPersonalNewTab(tab))
+      .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+
+    const target = existingTabs[0];
+    if (!target?.id) return;
+
+    await chrome.tabs.update(target.id, { active: true });
+    await chrome.windows.update(target.windowId, { focused: true });
+    await chrome.tabs.remove(candidateTab.id);
+  } catch (error) {
+    // A tab can disappear while Chrome is dispatching events. That is harmless;
+    // leave the new tab open instead of interrupting the user's workflow.
+    console.warn('[tab-out] Could not reuse the existing new tab:', error);
+  } finally {
+    redirectingNewTabIds.delete(candidateTab.id);
+  }
+}
+
 /**
  * updateBadge()
  *
@@ -72,9 +113,10 @@ chrome.runtime.onStartup.addListener(() => {
   updateBadge();
 });
 
-// Update badge whenever a tab is opened
-chrome.tabs.onCreated.addListener(() => {
+// Update the badge and reuse an existing personal new-tab page when possible.
+chrome.tabs.onCreated.addListener((tab) => {
   updateBadge();
+  return reuseExistingNewTab(tab);
 });
 
 // Update badge whenever a tab is closed
@@ -82,9 +124,11 @@ chrome.tabs.onRemoved.addListener(() => {
   updateBadge();
 });
 
-// Update badge when a tab's URL changes (e.g. navigating to/from chrome://)
-chrome.tabs.onUpdated.addListener(() => {
+// The final extension URL may only become available after onCreated, so check
+// again when Chrome reports the first URL update.
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
   updateBadge();
+  if (changeInfo.url) return reuseExistingNewTab(tab);
 });
 
 // ─── Initial run ─────────────────────────────────────────────────────────────
