@@ -94,3 +94,8 @@ Once the extension is loaded:
 - Saved tabs are stored in `chrome.storage.local` (persists across sessions).
 - 100% local. No data is sent to any external service.
 - To update: `cd tab-out && git pull`, then reload the extension in `chrome://extensions`.
+
+## Built-in shortcut logos
+
+- Every built-in or preconfigured shortcut must use that service or site's own official logo stored locally in `extension/assets/` when an official logo is available; do not substitute a generic globe or placeholder.
+- When correcting or adding a built-in logo, increment the quick-link schema and migrate the corresponding `logo` and `logoType` fields so existing installations receive the official asset without losing user-created links.
