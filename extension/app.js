@@ -1503,9 +1503,17 @@ const DEFAULT_QUICK_LINKS = [
     ],
   },
   {
-    id: 'school', label: '学校及科研相关', links: [
+    id: 'school', label: '学校', links: [
       { id: 'bucm-digital', name: '数字北中医', url: 'https://i.bucm.edu.cn', logo: 'assets/bucm.png', logoType: 'bucm' },
       { id: 'bucm-jw', name: '本科教务系统', url: 'https://jw.bucm.edu.cn', logo: 'assets/bucm.png', logoType: 'bucm' },
+      { id: 'bucm-class', name: '课间 · 我的课表', url: 'https://152.136.137.158/class/', logo: 'assets/ke-jian.svg', logoType: 'ke-jian' },
+    ],
+  },
+  {
+    id: 'research', label: '科研', links: [
+      { id: 'pubmed', name: 'PubMed', url: 'https://pubmed.ncbi.nlm.nih.gov/', logo: 'assets/pubmed-logo.svg', logoType: 'pubmed' },
+      { id: 'bucm-library', name: '学校图书馆', url: 'https://slib.bucm.edu.cn/', logo: 'assets/bucm.png', logoType: 'bucm' },
+      { id: 'paper-tracking', name: '已投论文追踪', url: 'https://slib.bucm.edu.cn/', logo: 'assets/editorial-manager.png', logoType: 'editorial-manager' },
     ],
   },
   {
@@ -1517,7 +1525,7 @@ const DEFAULT_QUICK_LINKS = [
   },
 ];
 
-const QUICK_LINKS_SCHEMA_VERSION = 3;
+const QUICK_LINKS_SCHEMA_VERSION = 5;
 
 const quickLinkState = {
   editing: false,
@@ -1587,6 +1595,8 @@ function migrateQuickLinks(categories) {
   const migrated = structuredClone(categories);
   const aiCategory = migrated.find(category => category.id === 'ai');
   const schoolCategory = migrated.find(category => category.id === 'school');
+  const defaultSchool = DEFAULT_QUICK_LINKS.find(category => category.id === 'school');
+  const defaultResearch = DEFAULT_QUICK_LINKS.find(category => category.id === 'research');
 
   if (aiCategory) {
     aiCategory.label = '门户及 AI 工具';
@@ -1607,7 +1617,38 @@ function migrateQuickLinks(categories) {
     if (qwenLink) qwenLink.logo = 'assets/qwen-blue.png';
   }
 
-  if (schoolCategory) schoolCategory.label = '学校及科研相关';
+  if (schoolCategory) {
+    schoolCategory.label = '学校';
+    const classLink = defaultSchool.links.find(link => link.id === 'bucm-class');
+    if (!schoolCategory.links.some(link => link.id === classLink.id)) {
+      schoolCategory.links.push(structuredClone(classLink));
+    }
+  } else {
+    migrated.push(structuredClone(defaultSchool));
+  }
+
+  let researchCategory = migrated.find(category => category.id === 'research');
+  if (!researchCategory) {
+    researchCategory = structuredClone(defaultResearch);
+    const schoolIndex = migrated.findIndex(category => category.id === 'school');
+    migrated.splice(schoolIndex >= 0 ? schoolIndex + 1 : migrated.length, 0, researchCategory);
+  } else {
+    researchCategory.label = '科研';
+    for (const link of defaultResearch.links) {
+      if (!researchCategory.links.some(existing => existing.id === link.id)) {
+        researchCategory.links.push(structuredClone(link));
+      }
+    }
+  }
+
+  for (const linkId of ['bucm-class', 'pubmed', 'paper-tracking']) {
+    const defaultLink = defaultLinkFor(linkId);
+    const migratedLink = migrated.flatMap(category => category.links).find(link => link.id === linkId);
+    if (migratedLink && defaultLink) {
+      migratedLink.logo = defaultLink.logo;
+      migratedLink.logoType = defaultLink.logoType;
+    }
+  }
   return migrated;
 }
 
@@ -1616,7 +1657,7 @@ function renderQuickLinks() {
   if (!grid) return;
   grid.classList.toggle('editing', quickLinkState.editing);
   grid.innerHTML = quickLinkState.categories.map((category, index) => `
-    <section class="quick-category" aria-labelledby="quick-category-${escapeHtml(category.id)}">
+    <section class="quick-category" data-category-id="${escapeHtml(category.id)}" aria-labelledby="quick-category-${escapeHtml(category.id)}">
       <header class="quick-category-header">
         <h3 id="quick-category-${escapeHtml(category.id)}">${escapeHtml(category.label)}</h3>
         <span class="category-index">0${index + 1}</span>
@@ -1760,6 +1801,29 @@ function filterVisibleTabs(query) {
   });
 }
 
+async function searchTheWeb(query) {
+  const text = query.trim();
+  if (!text) return;
+
+  if (globalThis.chrome?.search?.query) {
+    await chrome.search.query({ text, disposition: 'CURRENT_TAB' });
+    return;
+  }
+
+  location.href = `https://www.google.com/search?q=${encodeURIComponent(text)}`;
+}
+
+function isTextEntryElement(element) {
+  return element?.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(element?.tagName);
+}
+
+function focusWebSearch() {
+  const input = document.getElementById('webSearchInput');
+  if (!input || quickLinkElements.dialog?.open) return;
+  if (isTextEntryElement(document.activeElement) && document.activeElement !== input) return;
+  requestAnimationFrame(() => input.focus({ preventScroll: true }));
+}
+
 quickLinkElements.toggle?.addEventListener('click', () => {
   quickLinkState.editing = !quickLinkState.editing;
   quickLinkElements.toggle.classList.toggle('active', quickLinkState.editing);
@@ -1788,19 +1852,54 @@ quickLinkElements.grid?.addEventListener('keydown', event => {
 
 quickLinkElements.form?.addEventListener('submit', saveLinkFromDialog);
 
+document.getElementById('webSearchForm')?.addEventListener('submit', async event => {
+  event.preventDefault();
+  const input = document.getElementById('webSearchInput');
+  await searchTheWeb(input?.value || '');
+});
+
 document.getElementById('refreshTabs')?.addEventListener('click', renderDashboard);
 document.getElementById('tabSearch')?.addEventListener('input', event => filterVisibleTabs(event.target.value));
 document.addEventListener('keydown', event => {
-  const search = document.getElementById('tabSearch');
+  const tabSearch = document.getElementById('tabSearch');
+  const webSearch = document.getElementById('webSearchInput');
   if (event.key === '/' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
     event.preventDefault();
-    search?.focus();
+    tabSearch?.focus();
   }
-  if (event.key === 'Escape' && document.activeElement === search) {
-    search.value = '';
-    search.blur();
+  if (event.key === 'Escape' && document.activeElement === tabSearch) {
+    tabSearch.value = '';
+    tabSearch.blur();
     filterVisibleTabs('');
   }
+  if (event.key === 'Escape' && document.activeElement === webSearch) {
+    webSearch.value = '';
+    webSearch.blur();
+  }
+
+  const canStartWebSearch =
+    !event.defaultPrevented &&
+    event.key.length === 1 &&
+    event.key !== '/' &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    !event.isComposing &&
+    !isTextEntryElement(document.activeElement) &&
+    !quickLinkElements.dialog?.open;
+
+  if (canStartWebSearch && webSearch) {
+    event.preventDefault();
+    webSearch.focus();
+    webSearch.value = event.key;
+    webSearch.setSelectionRange(webSearch.value.length, webSearch.value.length);
+  }
+});
+
+window.addEventListener('focus', focusWebSearch);
+window.addEventListener('pageshow', focusWebSearch);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') focusWebSearch();
 });
 
 let renderTimer;
@@ -1823,3 +1922,4 @@ updateClock();
 setInterval(updateClock, 30_000);
 loadQuickLinks();
 renderDashboard();
+focusWebSearch();
