@@ -1513,7 +1513,7 @@ const DEFAULT_QUICK_LINKS = [
     id: 'research', label: '科研', links: [
       { id: 'pubmed', name: 'PubMed', url: 'https://pubmed.ncbi.nlm.nih.gov/', logo: 'assets/pubmed-logo.svg', logoType: 'pubmed' },
       { id: 'bucm-library', name: '学校图书馆', url: 'https://slib.bucm.edu.cn/', logo: 'assets/bucm.png', logoType: 'bucm' },
-      { id: 'paper-tracking', name: '已投论文追踪', url: 'https://slib.bucm.edu.cn/', logo: 'assets/editorial-manager.png', logoType: 'editorial-manager' },
+      { id: 'paper-tracking', name: '已投论文追踪', url: 'https://www.editorialmanager.com/ctim/default2.aspx', logo: 'assets/editorial-manager.png', logoType: 'editorial-manager' },
     ],
   },
   {
@@ -1526,7 +1526,7 @@ const DEFAULT_QUICK_LINKS = [
   },
 ];
 
-const QUICK_LINKS_SCHEMA_VERSION = 6;
+const QUICK_LINKS_SCHEMA_VERSION = 7;
 
 const quickLinkState = {
   editing: false,
@@ -1661,6 +1661,7 @@ function migrateQuickLinks(categories) {
     if (migratedLink && defaultLink) {
       migratedLink.logo = defaultLink.logo;
       migratedLink.logoType = defaultLink.logoType;
+      if (linkId === 'paper-tracking') migratedLink.url = defaultLink.url;
     }
   }
   return migrated;
