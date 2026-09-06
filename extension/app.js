@@ -1519,13 +1519,14 @@ const DEFAULT_QUICK_LINKS = [
   {
     id: 'other', label: '其他', links: [
       { id: 'bilibili', name: '哔哩哔哩', url: 'https://www.bilibili.com', logo: 'assets/bilibili.svg', logoType: 'bilibili' },
+      { id: 'xiaohongshu', name: '小红书', url: 'https://www.xiaohongshu.com/', logo: 'assets/xiaohongshu.png', logoType: 'xiaohongshu' },
       { id: 'x', name: 'X', url: 'https://x.com', logo: 'assets/x.svg' },
       { id: 'youtube', name: 'YouTube', url: 'https://www.youtube.com', logo: 'assets/youtube.svg', logoType: 'youtube' },
     ],
   },
 ];
 
-const QUICK_LINKS_SCHEMA_VERSION = 5;
+const QUICK_LINKS_SCHEMA_VERSION = 6;
 
 const quickLinkState = {
   editing: false,
@@ -1597,6 +1598,7 @@ function migrateQuickLinks(categories) {
   const schoolCategory = migrated.find(category => category.id === 'school');
   const defaultSchool = DEFAULT_QUICK_LINKS.find(category => category.id === 'school');
   const defaultResearch = DEFAULT_QUICK_LINKS.find(category => category.id === 'research');
+  const defaultOther = DEFAULT_QUICK_LINKS.find(category => category.id === 'other');
 
   if (aiCategory) {
     aiCategory.label = '门户及 AI 工具';
@@ -1641,7 +1643,19 @@ function migrateQuickLinks(categories) {
     }
   }
 
-  for (const linkId of ['bucm-class', 'pubmed', 'paper-tracking']) {
+  let otherCategory = migrated.find(category => category.id === 'other');
+  if (!otherCategory) {
+    otherCategory = structuredClone(defaultOther);
+    migrated.push(otherCategory);
+  } else {
+    otherCategory.label = '其他';
+    const xiaohongshuLink = defaultOther.links.find(link => link.id === 'xiaohongshu');
+    if (!otherCategory.links.some(link => link.id === xiaohongshuLink.id)) {
+      otherCategory.links.splice(1, 0, structuredClone(xiaohongshuLink));
+    }
+  }
+
+  for (const linkId of ['bucm-class', 'pubmed', 'paper-tracking', 'xiaohongshu']) {
     const defaultLink = defaultLinkFor(linkId);
     const migratedLink = migrated.flatMap(category => category.links).find(link => link.id === linkId);
     if (migratedLink && defaultLink) {
