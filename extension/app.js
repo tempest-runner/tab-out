@@ -1770,25 +1770,16 @@ async function removeQuickLink(categoryId, linkId) {
   showToast('入口已移除');
 }
 
-async function openOrFocusQuickLink(url) {
+async function openQuickLink(url) {
   if (!globalThis.chrome?.tabs) {
     window.open(url, '_blank', 'noopener');
     return;
   }
   try {
-    const target = new URL(url);
-    const tabs = await chrome.tabs.query({});
-    const existing = tabs.find(tab => {
-      try { return new URL(tab.url).hostname === target.hostname; }
-      catch { return false; }
-    });
-    if (existing?.id) {
-      await chrome.tabs.update(existing.id, { active: true });
-      await chrome.windows.update(existing.windowId, { focused: true });
-    } else {
-      const current = await chrome.tabs.getCurrent();
-      await chrome.tabs.update(current.id, { url });
-    }
+    // Shortcuts open their configured destination, even when another page on
+    // the same site is already open. Existing tabs are selected in the tab list.
+    const current = await chrome.tabs.getCurrent();
+    await chrome.tabs.update(current.id, { url });
   } catch (error) {
     console.warn('[tab-out] Could not open quick link:', error);
   }
@@ -1855,14 +1846,14 @@ quickLinkElements.grid?.addEventListener('click', event => {
   const linkId = linkElement.dataset.linkId;
   if (event.target.closest('.edit-link')) openLinkDialog(categoryId, linkId);
   else if (event.target.closest('.remove-link')) removeQuickLink(categoryId, linkId);
-  else if (!quickLinkState.editing) openOrFocusQuickLink(linkElement.dataset.url);
+  else if (!quickLinkState.editing) openQuickLink(linkElement.dataset.url);
 });
 
 quickLinkElements.grid?.addEventListener('keydown', event => {
   const linkElement = event.target.closest('.quick-link');
   if (!linkElement || quickLinkState.editing || !['Enter', ' '].includes(event.key)) return;
   event.preventDefault();
-  openOrFocusQuickLink(linkElement.dataset.url);
+  openQuickLink(linkElement.dataset.url);
 });
 
 quickLinkElements.form?.addEventListener('submit', saveLinkFromDialog);
